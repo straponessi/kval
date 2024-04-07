@@ -1,9 +1,12 @@
-# kval
 
+plugins {
+    id("com.android.application") version "8.2.0" apply false
+    id("org.jetbrains.kotlin.android") version "1.9.10" apply false
+}
 
-__________________________________________________________________________________________________________________________________________________________
+____________________________________________________________________________________________________
 BuildGRANDLE
-__________________________________________________________________________________________________________________________________________________________
+____________________________________________________________________________________________________
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -61,9 +64,9 @@ dependencies {
     kapt("androidx.room:room-compiler:$roomVersion")
 }
 
-__________________________________________________________________________________________________________________________________________________________
+____________________________________________________________________________________________________
 DataBase
-__________________________________________________________________________________________________________________________________________________________
+____________________________________________________________________________________________________
 
 class DataBase {
     @Database(entities = [Entity.User::class,Entity.Fav::class, Entity.Record::class], version = 1)
@@ -132,10 +135,6 @@ class Entity {
     )
 }
 
-__________________________________________________________________________________________________________________________________________________________
-AutActivity
-__________________________________________________________________________________________________________________________________________________________
-
 class AutActivity : AppCompatActivity() {
     private lateinit var binding: ActivityAutBinding
     private lateinit var userDatabase: DataBase.AppDatabase
@@ -177,93 +176,52 @@ class AutActivity : AppCompatActivity() {
             startActivity(intent)
             finish()
         }
-
     }
 }
-__________________________________________________________________________________________________________________________________________________________
-FavActivity
-__________________________________________________________________________________________________________________________________________________________
 
-class FavActivity : AppCompatActivity() {
-    private lateinit var binding: ActivityFavBinding
+class RegActivity : AppCompatActivity() {
+    private lateinit var binding: ActivityRegBinding
     private lateinit var userDatabase: DataBase.AppDatabase
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        binding = ActivityFavBinding.inflate(layoutInflater)
+        binding = ActivityRegBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
         userDatabase = Room.databaseBuilder(
             applicationContext,
-            DataBase.AppDatabase::class.java,
-            "user_database"
+            DataBase.AppDatabase::class.java, "user_database"
         ).build()
-        val id = intent.getIntExtra("id", 0)
 
-        CoroutineScope(Dispatchers.IO).launch {
-            withContext(Dispatchers.IO) {
-
-                val recyclerView: RecyclerView = findViewById(R.id.recyclerViewFav)
-                recyclerView.layoutManager = LinearLayoutManager(this@FavActivity)
-
-                val myFavList : List<Entity.Record> = userDatabase.favDao().getFavRecords(id)!!
-                val adapter = AdapterFav(myFavList, id, userDatabase)
-
-                recyclerView.adapter = adapter
-
+        binding.btAction.setOnClickListener {
+            if (binding.etLogin.text.isEmpty() || binding.etPassword.text.isEmpty()){
+                Toast.makeText(this, "Все поля должны быть заполнены!", Toast.LENGTH_SHORT).show()
+            }
+            else{
+                CoroutineScope(Dispatchers.IO).launch {
+                    val userExist = userDatabase.userDao().checkLogin(binding.etLogin.text.toString())
+                    if (userExist != null){
+                        Toast.makeText(this@RegActivity, "Логин не доступен", Toast.LENGTH_SHORT).show()
+                    }
+                    else{
+                        val user = Entity.User(
+                            login = binding.etLogin.text.toString(),
+                            password = binding.etPassword.text.toString(),
+                        )
+                        userDatabase.userDao().insertUser(user)
+                        withContext(Dispatchers.Main){
+                            Toast.makeText(this@RegActivity, "Запись добавлена", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                }
             }
         }
-        binding.btBackMain.setOnClickListener {
-            val intent = Intent(this@FavActivity, MainActivity::class.java)
-            intent.putExtra("id", id)
+        binding.btBack.setOnClickListener {
+            val intent = Intent(this, AutActivity::class.java)
             startActivity(intent)
             finish()
         }
     }
 }
-
-__________________________________________________________________________________________________________________________________________________________
-LentaActivity 
-__________________________________________________________________________________________________________________________________________________________
-
-class LentaActivity : AppCompatActivity() {
-
-    private lateinit var binding: ActivityLentaBinding
-    private lateinit var userDatabase: DataBase.AppDatabase
-
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        binding = ActivityLentaBinding.inflate(layoutInflater)
-        setContentView(binding.root)
-
-        userDatabase = Room.databaseBuilder(
-            applicationContext,
-            DataBase.AppDatabase::class.java,
-            "user_database"
-        ).build()
-        val id = intent.getIntExtra("id", 0)
-
-        CoroutineScope(Dispatchers.IO).launch {
-
-            val recyclerView : RecyclerView = findViewById(R.id.recyclerView)
-            recyclerView.layoutManager = LinearLayoutManager(this@LentaActivity)
-
-            val myDataList: List<Entity.Record> = userDatabase.recordDao().getAllRecords()
-            val adapter = Adapter(myDataList, id, userDatabase)
-            recyclerView.adapter = adapter
-        }
-
-        binding.btBackMain.setOnClickListener {
-            val intent = Intent(this, MainActivity::class.java)
-            intent.putExtra("id", id)
-            startActivity(intent)
-            finish()
-        }
-    }
-}
-
-
-__________________________________________________________________________________________________________________________________________________________
-MainActivity 
-__________________________________________________________________________________________________________________________________________________________
 
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
@@ -311,59 +269,204 @@ class MainActivity : AppCompatActivity() {
     }
 }
 
-__________________________________________________________________________________________________________________________________________________________
-RegActivity
-__________________________________________________________________________________________________________________________________________________________
+class Adapter (private val dataList: List<Entity.Record>, private val userId : Int, private val db : DataBase.AppDatabase) : RecyclerView.Adapter<Adapter.MyViewHolder>() {
+    class MyViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView){
 
-class RegActivity : AppCompatActivity() {
-    private lateinit var binding: ActivityRegBinding
+        val textview1 : TextView = itemView.findViewById(R.id.tvStart_EndCityCode1)
+        val textview2 : TextView = itemView.findViewById(R.id.tvStart_EndCityName1)
+        val textview3 : TextView = itemView.findViewById(R.id.tvStartDate1)
+        val textview4 : TextView = itemView.findViewById(R.id.tvEndDate1)
+        val textview5 : TextView = itemView.findViewById(R.id.tvPrice1)
+        val button : Button = itemView.findViewById(R.id.btFav11)
+    }
+
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): MyViewHolder {
+        val itemView = LayoutInflater.from(parent.context).inflate(R.layout.item_layout, parent, false)
+        return MyViewHolder(itemView)
+    }
+
+    override fun onBindViewHolder(holder: MyViewHolder, position: Int) {
+        CoroutineScope(Dispatchers.IO).launch {
+            val currentItem = dataList[position]
+            val user = userId
+
+            val fav1Result = db.favDao().checkFav(currentItem.idRecord, user)
+            setFavButtonColor(holder.button,fav1Result)
+
+            holder.textview1.text = "${currentItem.startCityCode} + ${currentItem.endCityCode}"
+            holder.textview2.text = "${currentItem.startCity} + ${currentItem.endCity}"
+            holder.textview3.text = "Дата вылета ${currentItem.startDate}"
+            holder.textview4.text = "Дата прилета ${currentItem.endDate} "
+            holder.textview5.text = "Цена: ${currentItem.price} золотых"
+
+            holder.button.setOnClickListener {
+                toggleFav(
+                    holder.button,
+                    currentItem.idRecord,
+                    userId,
+                    fav1Result
+                )
+            }
+            holder.button.setOnClickListener {
+                toggleFav(holder.button, currentItem.idRecord, userId, fav1Result)
+            }
+        }
+    }
+    private fun toggleFav(button: Button, idRecord: Int, idUser: Int, result: Entity.Fav?) {
+        CoroutineScope(Dispatchers.IO).launch {
+            if (result == null) {
+                db.favDao().insertFav(Entity.Fav(idRecord = idRecord, idUser = idUser))
+                setFavButtonColor(button, db.favDao().checkFav(idRecord, idUser))
+            } else {
+                db.favDao().deleteFav(result)
+                setFavButtonColor(button, null)
+            }
+        }
+    }
+    private fun setFavButtonColor(button: Button, result: Entity.Fav?) {
+        if (result == null) {
+            button.setBackgroundColor(Color.GRAY)
+            button.text = "Сохранить"
+        } else {
+            button.setBackgroundColor(Color.RED)
+            button.text = "Сохранено"
+        }
+    }
+    override fun getItemCount() = dataList.size
+}
+class LentaActivity : AppCompatActivity() {
+    private lateinit var binding: ActivityLentaBinding
     private lateinit var userDatabase: DataBase.AppDatabase
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        binding = ActivityRegBinding.inflate(layoutInflater)
+        binding = ActivityLentaBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
         userDatabase = Room.databaseBuilder(
             applicationContext,
-            DataBase.AppDatabase::class.java, "user_database"
+            DataBase.AppDatabase::class.java,
+            "user_database"
         ).build()
+        val id = intent.getIntExtra("id", 0)
 
-        binding.btAction.setOnClickListener {
-            if (binding.etLogin.text.isEmpty() || binding.etPassword.text.isEmpty()){
-                Toast.makeText(this, "Все поля должны быть заполнены!", Toast.LENGTH_SHORT).show()
-            }
-            else{
-                CoroutineScope(Dispatchers.IO).launch {
-                    val userExist = userDatabase.userDao().checkLogin(binding.etLogin.text.toString())
-                    if (userExist != null){
-                        Toast.makeText(this@RegActivity, "Логин не доступен", Toast.LENGTH_SHORT).show()
-                    }
-                    else{
-                        val user = Entity.User(
-                            login = binding.etLogin.text.toString(),
-                            password = binding.etPassword.text.toString(),
-                        )
-                        userDatabase.userDao().insertUser(user)
-                        withContext(Dispatchers.Main){
-                            Toast.makeText(this@RegActivity, "Запись добавлена", Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                }
-            }
+        CoroutineScope(Dispatchers.IO).launch {
+
+            val recyclerView : RecyclerView = findViewById(R.id.recyclerView)
+            recyclerView.layoutManager = LinearLayoutManager(this@LentaActivity)
+
+            val myDataList: List<Entity.Record> = userDatabase.recordDao().getAllRecords()
+            val adapter = Adapter(myDataList, id, userDatabase)
+            recyclerView.adapter = adapter
         }
-        binding.btBack.setOnClickListener {
-            val intent = Intent(this, AutActivity::class.java)
+
+        binding.btBackMain.setOnClickListener {
+            val intent = Intent(this, MainActivity::class.java)
+            intent.putExtra("id", id)
             startActivity(intent)
             finish()
         }
-
     }
 }
 
+class AdapterFav (private val dataList: List<Entity.Record>, private val userId : Int, private val db : DataBase.AppDatabase) : RecyclerView.Adapter<AdapterFav.MyViewHolder>() {
+    class MyViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView){
 
-__________________________________________________________________________________________________________________________________________________________
+        val textview1 : TextView = itemView.findViewById(R.id.tvStart_EndCityCode1)
+        val textview2 : TextView = itemView.findViewById(R.id.tvStart_EndCityName1)
+        val textview3 : TextView = itemView.findViewById(R.id.tvStartDate1)
+        val textview4 : TextView = itemView.findViewById(R.id.tvEndDate1)
+        val textview5 : TextView = itemView.findViewById(R.id.tvPrice1)
+        val button : Button = itemView.findViewById(R.id.btFav11)
+    }
+
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): MyViewHolder {
+        val itemView = LayoutInflater.from(parent.context).inflate(R.layout.item_layout, parent, false)
+        return MyViewHolder(itemView)
+    }
+
+    override fun onBindViewHolder(holder: MyViewHolder, position: Int) {
+
+        CoroutineScope(Dispatchers.IO).launch {
+            val currentItem = dataList[position]
+            val user = userId
+            val fav1Result = db.favDao().checkFav(currentItem.idRecord, user)
+
+            setFavButtonColor(holder.button, fav1Result)
+            holder.button.text = "Удалить"
+
+            holder.textview1.text = "${currentItem.startCityCode} + ${currentItem.endCityCode}"
+            holder.textview2.text = "${currentItem.startCity} + ${currentItem.endCity}"
+            holder.textview3.text = "Дата вылета ${currentItem.startDate}"
+            holder.textview4.text = "Дата прилета ${currentItem.endDate} "
+            holder.textview5.text = "Цена: ${currentItem.price} золотых"
+
+            holder.button.setOnClickListener{
+                toggleFav(holder.button, currentItem.idRecord, userId, fav1Result)
+            }
+        }
+    }
+    private fun toggleFav(button: Button, idRecord: Int, idUser: Int, result: Entity.Fav?) {
+        CoroutineScope(Dispatchers.IO).launch {
+            if (result == null) {
+                db.favDao().insertFav(Entity.Fav(idRecord = idRecord, idUser = idUser))
+                setFavButtonColor(button, db.favDao().checkFav(idRecord, idUser))
+            } else {
+                db.favDao().deleteFav(result)
+                setFavButtonColor(button, null)
+            }
+        }
+    }
+    private fun setFavButtonColor(button: Button, result: Entity.Fav?) {
+        if (result == null) {
+            button.setBackgroundColor(Color.GRAY)
+            button.text = "Удалено"
+        } else {
+            button.setBackgroundColor(Color.RED)
+            button.text = "Удалить"
+        }
+    }
+    override fun getItemCount() = dataList.size
+}
+
+class FavActivity : AppCompatActivity() {
+    private lateinit var binding: ActivityFavBinding
+    private lateinit var userDatabase: DataBase.AppDatabase
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        binding = ActivityFavBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+        userDatabase = Room.databaseBuilder(
+            applicationContext,
+            DataBase.AppDatabase::class.java,
+            "user_database"
+        ).build()
+        val id = intent.getIntExtra("id", 0)
+
+        CoroutineScope(Dispatchers.IO).launch {
+            withContext(Dispatchers.IO) {
+
+                val recyclerView: RecyclerView = findViewById(R.id.recyclerViewFav)
+                recyclerView.layoutManager = LinearLayoutManager(this@FavActivity)
+
+                val myFavList : List<Entity.Record> = userDatabase.favDao().getFavRecords(id)!!
+                val adapter = AdapterFav(myFavList, id, userDatabase)
+
+                recyclerView.adapter = adapter
+            }
+        }
+        binding.btBackMain.setOnClickListener {
+            val intent = Intent(this@FavActivity, MainActivity::class.java)
+            intent.putExtra("id", id)
+            startActivity(intent)
+            finish()
+        }
+    }
+}
+
+____________________________________________________________________________________________________
 activity_aut
-__________________________________________________________________________________________________________________________________________________________
+____________________________________________________________________________________________________
 
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
@@ -372,7 +475,6 @@ ________________________________________________________________________________
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     tools:context=".AutActivity">
-
     <EditText
         android:id="@+id/etLogin"
         android:layout_width="wrap_content"
@@ -386,7 +488,6 @@ ________________________________________________________________________________
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintBottom_toBottomOf="parent"/>
-
     <EditText
         android:id="@+id/etPassword"
         android:layout_width="wrap_content"
@@ -399,7 +500,6 @@ ________________________________________________________________________________
         app:layout_constraintEnd_toEndOf="@+id/etLogin"
         app:layout_constraintStart_toStartOf="@+id/etLogin"
         app:layout_constraintTop_toBottomOf="@+id/etLogin"/>
-
     <Button
         android:id="@+id/btBack"
         android:layout_width="0dp"
@@ -411,7 +511,6 @@ ________________________________________________________________________________
         app:layout_constraintEnd_toEndOf="@+id/btAction"
         app:layout_constraintStart_toStartOf="@+id/btAction"
         app:layout_constraintTop_toBottomOf="@+id/btAction" />
-
     <Button
         android:id="@+id/btAction"
         android:layout_width="0dp"
@@ -424,10 +523,9 @@ ________________________________________________________________________________
 
 </androidx.constraintlayout.widget.ConstraintLayout>
 
-
-__________________________________________________________________________________________________________________________________________________________
+____________________________________________________________________________________________________
 activity_fav
-__________________________________________________________________________________________________________________________________________________________
+____________________________________________________________________________________________________
 
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
@@ -444,7 +542,6 @@ ________________________________________________________________________________
         app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
         tools:listitem="@layout/item_layout">
     </androidx.recyclerview.widget.RecyclerView>
-
     <Button
         android:id="@+id/btBackMain"
         android:layout_width="wrap_content"
@@ -456,10 +553,9 @@ ________________________________________________________________________________
         app:layout_constraintStart_toStartOf="parent" />
 </androidx.constraintlayout.widget.ConstraintLayout>
 
-
-__________________________________________________________________________________________________________________________________________________________
+____________________________________________________________________________________________________
 activity_lenta
-__________________________________________________________________________________________________________________________________________________________
+____________________________________________________________________________________________________
 
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
@@ -476,7 +572,6 @@ ________________________________________________________________________________
         app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
         tools:listitem="@layout/item_layout">
     </androidx.recyclerview.widget.RecyclerView>
-
     <Button
         android:id="@+id/btBackMain"
         android:layout_width="wrap_content"
@@ -488,13 +583,11 @@ ________________________________________________________________________________
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintVertical_bias="1.0" />
-
 </androidx.constraintlayout.widget.ConstraintLayout>
 
-__________________________________________________________________________________________________________________________________________________________
+____________________________________________________________________________________________________
 activity_main
-__________________________________________________________________________________________________________________________________________________________
-
+____________________________________________________________________________________________________
 
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
@@ -503,7 +596,6 @@ ________________________________________________________________________________
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     tools:context=".MainActivity">
-
     <TextView
         android:id="@+id/etUserName"
         android:layout_width="wrap_content"
@@ -514,7 +606,6 @@ ________________________________________________________________________________
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/etUserSurname"
         app:layout_constraintVertical_bias="0.068" />
-
     <Button
         android:id="@+id/btLenta"
         android:layout_width="wrap_content"
@@ -526,7 +617,6 @@ ________________________________________________________________________________
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintVertical_bias="0.443" />
-
     <Button
         android:id="@+id/btFav"
         android:layout_width="wrap_content"
@@ -538,7 +628,6 @@ ________________________________________________________________________________
         app:layout_constraintStart_toEndOf="@+id/btExit"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintVertical_bias="0.443" />
-
     <Button
         android:id="@+id/btExit"
         android:layout_width="wrap_content"
@@ -549,7 +638,6 @@ ________________________________________________________________________________
         app:layout_constraintStart_toEndOf="@+id/btLenta"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintVertical_bias="0.443" />
-
     <TextView
         android:id="@+id/etUserSurname"
         android:layout_width="wrap_content"
@@ -559,13 +647,11 @@ ________________________________________________________________________________
         app:layout_constraintHorizontal_bias="0.498"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
-
 </androidx.constraintlayout.widget.ConstraintLayout>
 
-
-__________________________________________________________________________________________________________________________________________________________
+____________________________________________________________________________________________________
 activity_reg
-__________________________________________________________________________________________________________________________________________________________
+____________________________________________________________________________________________________
 
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
@@ -574,8 +660,6 @@ ________________________________________________________________________________
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     tools:context=".RegActivity">
-
-
     <EditText
         android:id="@+id/etLogin"
         android:layout_width="wrap_content"
@@ -589,7 +673,6 @@ ________________________________________________________________________________
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintBottom_toBottomOf="parent"/>
-
     <EditText
         android:id="@+id/etPassword"
         android:layout_width="wrap_content"
@@ -602,8 +685,6 @@ ________________________________________________________________________________
         app:layout_constraintEnd_toEndOf="@+id/etLogin"
         app:layout_constraintStart_toStartOf="@+id/etLogin"
         app:layout_constraintTop_toBottomOf="@+id/etLogin" />
-
-
     <Button
         android:id="@+id/btAction"
         android:layout_width="0dp"
@@ -613,7 +694,6 @@ ________________________________________________________________________________
         app:layout_constraintEnd_toEndOf="@+id/etPassword"
         app:layout_constraintStart_toStartOf="@+id/etPassword"
         app:layout_constraintTop_toBottomOf="@+id/etPassword" />
-
     <Button
         android:id="@+id/btBack"
         android:layout_width="0dp"
@@ -627,11 +707,9 @@ ________________________________________________________________________________
         app:layout_constraintTop_toBottomOf="@+id/btAction" />
 </androidx.constraintlayout.widget.ConstraintLayout>
 
-
-__________________________________________________________________________________________________________________________________________________________
+____________________________________________________________________________________________________
 item_layout
-__________________________________________________________________________________________________________________________________________________________
-
+____________________________________________________________________________________________________
 
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
@@ -640,7 +718,6 @@ ________________________________________________________________________________
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:orientation="vertical"
     android:padding="16dp">
-
     <TextView
         android:id="@+id/tvStart_EndCityCode1"
         android:layout_width="match_parent"
@@ -650,7 +727,6 @@ ________________________________________________________________________________
         app:layout_constraintHorizontal_bias="0.0"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
-
     <TextView
         android:id="@+id/tvStart_EndCityName1"
         android:layout_width="match_parent"
@@ -661,7 +737,6 @@ ________________________________________________________________________________
         app:layout_constraintHorizontal_bias="0.0"
         app:layout_constraintStart_toStartOf="@id/tvStart_EndCityCode1"
         app:layout_constraintTop_toTopOf="@id/tvStart_EndCityCode1" />
-
     <TextView
         android:id="@+id/tvStartDate1"
         android:layout_width="match_parent"
@@ -670,7 +745,6 @@ ________________________________________________________________________________
         app:layout_constraintHorizontal_bias="0.0"
         app:layout_constraintStart_toStartOf="@id/tvStart_EndCityName"
         app:layout_constraintTop_toBottomOf="@+id/tvStart_EndCityName" />
-
     <TextView
         android:id="@+id/tvEndDate1"
         android:layout_width="match_parent"
@@ -687,7 +761,6 @@ ________________________________________________________________________________
         app:layout_constraintHorizontal_bias="0.0"
         app:layout_constraintStart_toStartOf="@id/tvEndDate"
         app:layout_constraintTop_toBottomOf="@+id/tvEndDate" />
-
     <Button
         android:id="@+id/btFav11"
         android:layout_width="match_parent"
@@ -697,15 +770,11 @@ ________________________________________________________________________________
         app:layout_constraintStart_toStartOf="@id/tvPrice1"
         app:layout_constraintTop_toBottomOf="@+id/tvPrice"
         android:layout_marginLeft="220dp"/>
-
 </LinearLayout>
 
-
-
-__________________________________________________________________________________________________________________________________________________________
+____________________________________________________________________________________________________
 Android_Manifest
-__________________________________________________________________________________________________________________________________________________________
-
+____________________________________________________________________________________________________
 
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
@@ -750,7 +819,9 @@ ________________________________________________________________________________
     </application>
 
 </manifest>
-
+____________________________________________________________________________________________________
+Query
+____________________________________________________________________________________________________
 
 INSERT INTO Record VALUES(1,'Москва','mow','Санкт-Петербург','led','2023-07-20T00:00:00Z','2023-07-25T00:00:00Z',2690,'MOW2007LED2507Y100');
 INSERT INTO Record VALUES(2,'Москва','mow','Нижний Новгород','goj','2023-08-07T08:15:00Z','2023-08-13T09:10:00Z',3140,'MOW0708GOJ1308Y100');
@@ -762,6 +833,3 @@ INSERT INTO Record VALUES(7,'Москва','mow','Краснодар','krr','202
 INSERT INTO Record VALUES(8,'Москва','mow','Екатеринбург','svx','2023-07-20T12:00:00Z','2023-07-26T12:00:00Z',5096,'MOW2006SVX2606Y100');
 INSERT INTO Record VALUES(9,'Москва','mov','Волгоград','vog','2023-07-27T11:10:00Z','2023-08-10T10:20:00Z',5140,'MOW2706VOG1007Y100');
 INSERT INTO Record VALUES(10,'Москва','mov','Пермь','pee','2023-07-09T21:00:00Z','2023-07-16T00:00:00Z',5140,'MOW0906PEE1606Y100');
-
-
-
