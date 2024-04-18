@@ -1,4 +1,79 @@
 
+    UPDATE Заказы 
+    SET ДатаРазмещения = DATEADD(year, 28, ДатаРазмещения), 
+     ДатаНазначения = DATEADD(year, 28, ДатаНазначения), 
+     ДатаИсполнения = DATEADD(year, 28, ДатаИсполнения)
+
+   
+
+
+    SELECT Поставщики.Название AS Поставщик, SUM(Товары.НаСкладе) as НаСкладе 
+    FROM Поставщики 
+    JOIN Товары ON Поставщики.КодПоставщика = Товары.КодПоставщика 
+    WHERE Товары.НаСкладе > 0 
+    GROUP BY Поставщики.Название;
+
+ 
+
+
+    SELECT КодТипа, COUNT(*) AS Количество 
+    FROM Товары 
+    GROUP BY КодТипа;
+
+  
+
+
+    SELECT Категория, COUNT(КодЗаказа) AS КоличествоЗаказов 
+    FROM Типы 
+    JOIN Заказано ON Типы.КодТипа = Заказано.КодТовара 
+    GROUP BY Категория 
+    ORDER BY КоличествоЗаказов DESC
+
+   
+
+
+    SELECT 
+     YEAR(ДатаИсполнения) AS Год, 
+     COUNT(*) AS Количество_продаж 
+    FROM 
+     Заказы 
+    GROUP BY 
+     YEAR(ДатаИсполнения) 
+    ORDER BY 
+     YEAR(ДатаИсполнения);
+
+ 
+
+
+
+    SELECT TOP 1 
+     s.Страна 
+    FROM 
+     Поставщики s 
+    JOIN 
+     Товары p ON s.КодПоставщика = p.КодПоставщика 
+    GROUP BY 
+     s.Страна 
+    ORDER BY 
+     COUNT(*) DESC;
+
+   
+
+    SELECT 
+     * 
+    FROM 
+     Товары 
+    WHERE 
+     Цена > (SELECT AVG(Цена) FROM Товары);
+
+
+
+
+
+
+
+
+
 plugins {
     id("com.android.application") version "8.2.0" apply false
     id("org.jetbrains.kotlin.android") version "1.9.10" apply false
